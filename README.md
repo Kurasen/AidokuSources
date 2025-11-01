@@ -1,4 +1,4 @@
-# Aidoku Community Sources
+# Aidoku Community Sources Fork
 
 This repository hosts unofficial sources maintained by community members that are installable in [Aidoku](https://github.com/Aidoku/Aidoku).
 
