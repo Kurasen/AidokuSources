@@ -171,6 +171,7 @@ impl Url {
 		}
 		
 		Ok(request)
+	}
 }
 
 pub fn gen_explore_url(category: String, sort: String, page: i32) -> String {
