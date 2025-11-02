@@ -144,26 +144,33 @@ impl Url {
 			page,
 		})
 	}
-
+	
 	pub fn request(&self) -> Result<Request> {
 		let url = self.to_string();
 		let method = match self {
 			Url::Search { .. } => HttpMethod::Post,
 			_ => HttpMethod::Get,
 		};
-		let body = match self {
-			Url::Search { query, .. } => Some(format!(
-				r#"{{
-					"keyword": "{}",
-					"sort": "dd"
-				}}"#,
-				query
-			)),
-			_ => None,
-		};
-
-		create_request(url, method, body)
-	}
+    
+		let mut request = Request::new(url.parse()?, method);
+		
+		match self {
+			Url::Search { query, .. } => {
+				// 使用更安全的方式构建JSON
+				let json_body = format!(
+					r#"{{"keyword":{},"sort":"dd"}}"#,
+					// 将查询字符串作为JSON字符串字面量
+					serde_json::to_string(query).unwrap_or_else(|_| r#""""#.to_string())
+				);
+				
+				request = request
+					.body(json_body.as_bytes())
+					.header("Content-Type", "application/json");
+			}
+			_ => {}
+		}
+		
+		Ok(request)
 }
 
 pub fn gen_explore_url(category: String, sort: String, page: i32) -> String {
