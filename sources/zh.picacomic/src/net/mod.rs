@@ -90,87 +90,96 @@ impl Url {
 
 		let mut category = String::new();
 		let mut sort = String::from("dd");
+        let mut search_query = String::new();
+        let mut author = String::new();
+        let mut tag = String::new();
 
-		for filter in filters {
-			match filter {
-				FilterValue::Text { id, value } => match id.as_str() {
-					"author" => {
-						return Ok(Self::Author {
-							author: value.to_string(),
-							sort,
-							page,
-						});
-					}
-					_ => {
-						// Title search
-						return Ok(Self::Search {
-							query: value.to_string(),
-							page,
-						});
-					}
-				},
-				FilterValue::Select { id, value } => match id.as_str() {
-					"类别" => {
-						category = if value.as_str() == "全部" {
-							String::new()
-						} else {
-							value.to_string()
-						};
-					}
-					"genre" => {
-						return Ok(Self::Tag {
-							tag: value.to_string(),
-							sort,
-							page,
-						});
-					}
-					_ => {}
-				},
-				FilterValue::Sort { id, index, .. } => {
-					if id.as_str() == "排序" {
-						let sorts = ["dd", "da", "ld", "vd"];
-						if let Some(s) = sorts.get(*index as usize) {
-							sort = s.to_string();
-						}
-					}
-				}
-				_ => {}
-			}
-		}
+        for filter in filters {
+            match filter {
+                FilterValue::Text { id, value } => match id.as_str() {
+                    "author" => {
+                        author = value.to_string();
+                    }
+                    "title" | "query" => { // 标题搜索或其他查询字段
+                        search_query = value.to_string();
+                    }
+                    _ => {
+                        // 其他文本字段也视为搜索
+                        if search_query.is_empty() {
+                            search_query = value.to_string();
+                        }
+                    }
+                },
+                FilterValue::Select { id, value } => match id.as_str() {
+                    "类别" => {
+                        category = if value.as_str() == "全部" {
+                            String::new()
+                        } else {
+                            value.to_string()
+                        };
+                    }
+                    "genre" => {
+                        tag = value.to_string();
+                    }
+                    _ => {}
+                },
+                FilterValue::Sort { id, index, .. } => {
+                    if id.as_str() == "排序" {
+                        let sorts = ["dd", "da", "ld", "vd"];
+                        if let Some(s) = sorts.get(*index as usize) {
+                            sort = s.to_string();
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        // 按优先级决定返回哪种类型的请求
+        if !search_query.is_empty() {
+            Ok(Self::Search {
+                query: search_query,
+                page,
+            })
+        } else if !author.is_empty() {
+            Ok(Self::Author {
+                author,
+                sort,
+                page,
+            })
+        } else if !tag.is_empty() {
+            Ok(Self::Tag {
+                tag,
+                sort,
+                page,
+            })
+        } else {
+            Ok(Self::Explore {
+                category,
+                sort,
+                page,
+            })
+        }
+    }
 
-		Ok(Self::Explore {
-			category,
-			sort,
-			page,
-		})
-	}
-	
 	pub fn request(&self) -> Result<Request> {
 		let url = self.to_string();
 		let method = match self {
 			Url::Search { .. } => HttpMethod::Post,
 			_ => HttpMethod::Get,
 		};
-    
-		let mut request = Request::new(url.parse()?, method);
-		
-		match self {
-			Url::Search { query, .. } => {
-				// 使用更安全的方式构建JSON
-				let json_body = format!(
-					r#"{{"keyword":{},"sort":"dd"}}"#,
-					// 将查询字符串作为JSON字符串字面量
-					serde_json::to_string(query).unwrap_or_else(|_| r#""""#.to_string())
-				);
-				
-				request = request
-					.body(json_body.as_bytes())
-					.header("Content-Type", "application/json");
-			}
-			_ => {}
-		}
-		
-		Ok(request)
+		let body = match self {
+            Url::Search { query, page } => Some(format!(
+                r#"{{
+                    "keyword": "{}",
+                    "sort": "dd",
+                    "page": {}
+                }}"#,
+                query, page
+            )),
+			_ => None,
+		};
+
+		create_request(url, method, body)
 	}
 }
 
@@ -206,9 +215,9 @@ impl Display for Url {
 					gen_explore_url(category.to_string(), sort.to_string(), *page)
 				)
 			}
-			Url::Search { query: _, page } => {
-				write!(f, "{}/comics/advanced-search?page={}&s=dd", API_URL, page)
-			}
+            Url::Search { .. } => {
+                write!(f, "{}/comics/advanced-search", API_URL)
+            }
 			Url::Author { author, sort, page } => {
 				write!(
 					f,
