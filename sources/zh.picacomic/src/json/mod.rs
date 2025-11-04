@@ -9,16 +9,16 @@ use chrono::DateTime;
 
 #[derive(Deserialize)]
 pub struct ComicItem {
-	pub _id: String,
-	pub title: String,
-	pub author: String,
-	pub description: Option<String>,
-	pub thumb: Thumb,
-	pub categories: Vec<String>,
-	pub tags: Option<Vec<String>>,
-	pub finished: bool,
-	#[serde(rename = "pagesCount")]
-	pub pages_count: i32,
+    pub _id: String,
+    pub title: String,
+    pub author: String,
+    pub description: Option<String>,
+    pub thumb: Thumb,
+    pub categories: Vec<String>,
+    pub tags: Option<Vec<String>>,
+    pub finished: bool,
+    #[serde(rename = "pagesCount")]
+    pub pages_count: Option<i32>,  // 改为Option<i32>
 }
 
 #[derive(Deserialize)]
@@ -145,11 +145,20 @@ impl From<ComicItem> for Manga {
 		};
 		all_tags.extend(item.categories);
 
-		let description = if let Some(desc) = item.description {
-			Some(format!("页数：{}P  \n简介：{}", item.pages_count, desc))
-		} else {
-			Some(format!("页数：{}P", item.pages_count))
-		};
+        // 处理可选的pages_count字段
+        let description = if let Some(desc) = item.description {
+            if let Some(pages_count) = item.pages_count {
+                Some(format!("页数：{}P  \n简介：{}", pages_count, desc))
+            } else {
+                Some(format!("简介：{}", desc))
+            }
+        } else {
+            if let Some(pages_count) = item.pages_count {
+                Some(format!("页数：{}P", pages_count))
+            } else {
+                None
+            }
+        };
 
 		Manga {
 			key: item._id,
