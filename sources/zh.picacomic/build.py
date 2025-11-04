@@ -93,13 +93,13 @@ def package_aidoku_source():
                     for file in files:
                         file_path = os.path.join(root, file)
                         # 在ZIP中保持目录结构
-                        arcname = os.path.relpath(file_path, temp_dir.parent)
+                        arcname = os.path.relpath(file_path, temp_dir)
                         zipf.write(file_path, arcname)
 
             # 检查ZIP文件是否创建成功
             if os.path.exists(zip_filename):
                 file_size = os.path.getsize(zip_filename)
-                print(f"ZIP文件创建成功")
+                print(f"ZIP文件创建成功，大小: {file_size} 字节")
 
                 # 8. 重命名为.aix
                 if os.path.exists(aix_filename):
@@ -131,7 +131,7 @@ def package_aidoku_source():
             shutil.rmtree(temp_dir)
         wasm_target_dir = project_root / 'target'
         if wasm_target_dir.exists():
-            shutil.rmtree(wasm_target_dir)
+            run_command('cargo clean', cwd=project_root)
 
 
 def main():
