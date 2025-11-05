@@ -118,7 +118,7 @@ impl ListingProvider for Wnacg {
 			"monthup" => format!("/albums-favorite_ranking-page-{}-type-month", page),
 			"update" => format!("/albums-index-page-{}.html", page),
 			"doujinshi" => format!("/albums-index-page-{}-cate-5.html", page),
-			"one-shot" => format!("/albums-index-page-{}-cate-6.html", page),
+			"single-volume" => format!("/albums-index-page-{}-cate-6.html", page),
 			"magazine" => format!("/albums-index-page-{}-cate-7.html", page),
 			"korean" => format!("/albums-index-page-{}-cate-19.html", page),
 			_ => bail!("Invalid listing"),
