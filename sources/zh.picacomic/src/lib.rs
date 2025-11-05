@@ -27,7 +27,17 @@ impl Source for Picacomic {
 		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
 		let url = net::Url::from_query_or_filters(query.as_deref(), page, &filters)?;
-		let response = url.request()?.json_owned::<json::ExploreResponse>()?;
+//         if let net::Url::Search { query, sort, page } = &url {
+//             println!("[搜索调试] 查询: {}, 排序: {}, 页码: {}", query, sort, page);
+//         }
+
+        let response = url.request()?.json_owned::<json::ExploreResponse>()?;
+
+//         println!(" 搜索页码: {}, 总页数: {}, 结果数: {}",
+//             page,
+//             response.data.comics.pages,
+//             response.data.comics.docs.len()
+//         );
 
 		Ok(response.data.into())
 	}
