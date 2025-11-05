@@ -46,14 +46,13 @@ impl Url {
 
 		let mut category = String::new();
 		let mut tag = String::new();
+		let mut search_query = String::new();
 
 		for filter in filters {
 			match filter {
-				FilterValue::Text { value, .. } => {
-					return Ok(Self::Search {
-						query: encode_uri(value.clone()),
-						page,
-					});
+				FilterValue::Text { id: _, value } => {
+					// 任何文本过滤器都视为搜索
+					search_query = value.clone();
 				}
 				FilterValue::Select { id, value } => match id.as_str() {
 					"同人志" => category = value.clone(),
@@ -67,6 +66,15 @@ impl Url {
 			}
 		}
 
+		// 优先处理搜索查询
+		if !search_query.is_empty() {
+			return Ok(Self::Search {
+				query: encode_uri(&search_query),
+				page,
+			});
+		}
+
+		// 如果没有搜索查询，使用分类过滤
 		Ok(Self::Filter {
 			category,
 			tag,

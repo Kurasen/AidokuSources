@@ -1,6 +1,6 @@
 use crate::net::Url;
 use aidoku::{
-	Manga, MangaPageResult, MangaStatus, Result, Viewer,
+	Manga, MangaPageResult, MangaStatus, Result, Viewer, ContentRating,
 	alloc::{String, Vec, string::ToString as _},
 	error,
 	imports::{
@@ -53,14 +53,60 @@ impl MangaPage for Document {
 					cover: Some(cover),
 					title,
 					description: Some(description),
+					content_rating: ContentRating::NSFW,
 					..Default::default()
 				})
 			})
 			.collect();
+        // 		// 最保守的分页检测：只要有结果就认为可能有下一页
+        //         let has_next_page = !entries.is_empty();
 
-		let has_next_page = self
-			.select_first(".bot_toolbar .paginator .next")
-			.is_some();
+        let has_next_page = if entries.is_empty() {
+            false
+        } else {
+            // 检查分页器中是否有大于当前页码的数字
+            let mut page_numbers: Vec<i32> = Vec::new();
+
+            if let Some(paginator_links) = self.select(".bot_toolbar .paginator a") {
+                for el in paginator_links {
+                    if let Some(text) = el.text() {
+                        if let Ok(num) = text.parse::<i32>() {
+                            page_numbers.push(num);
+                        }
+                    }
+                }
+            }
+
+            // 获取当前页码
+            let current_page = if let Some(current_el) = self.select_first(".bot_toolbar .paginator .current") {
+                current_el.text().and_then(|text| text.parse::<i32>().ok()).unwrap_or(1)
+            } else {
+                1
+            };
+
+            // 主要修复：检查是否有明确的下一页指示器
+            let has_explicit_next = self.select(".bot_toolbar .paginator a")
+                .map(|links| {
+                    links.into_iter().any(|el| {
+                        if let Some(text) = el.text() {
+                            text.contains("下一页") || text.contains(">") || text.contains("next")
+                        } else {
+                            false
+                        }
+                    })
+                })
+                .unwrap_or(false);
+
+            // 如果有明确的下一页按钮，或者有更大的页码数字
+            if has_explicit_next {
+                true
+            } else if let Some(max_page) = page_numbers.iter().max() {
+                *max_page > current_page
+            } else {
+                // 保守策略：只有当条目数达到最大值时才认为可能有下一页
+                entries.len() >= 24 && current_page == 1 // 只在第一页使用这个判断
+            }
+        };
 
 		Ok(MangaPageResult {
 			entries,
@@ -160,6 +206,8 @@ impl MangaPage for Document {
 		// Status is already set above based on title
 		manga.update_strategy = aidoku::UpdateStrategy::Never;
 		manga.url = Some(Url::manga(manga.key.clone()).to_string());
+
+		manga.content_rating = ContentRating::NSFW;
 
 		Ok(())
 	}
