@@ -39,10 +39,11 @@ pub enum Url {
 		sort: String,
 		page: i32,
 	},
-	Search {
-		query: String,
-		page: i32,
-	},
+    Search {  // 添加 sort 字段
+        query: String,
+        sort: String,
+        page: i32,
+    },
 	Author {
 		author: String,
 		sort: String,
@@ -76,17 +77,33 @@ pub enum Url {
 }
 
 impl Url {
-	pub fn from_query_or_filters(
-		query: Option<&str>,
-		page: i32,
-		filters: &[FilterValue],
-	) -> Result<Self> {
-		if let Some(q) = query {
-			return Ok(Self::Search {
-				query: q.to_string(),
-				page,
-			});
-		}
+    pub fn from_query_or_filters(
+        query: Option<&str>,
+        page: i32,
+        filters: &[FilterValue],
+    ) -> Result<Self> {
+        let mut sort = String::from("dd"); // 默认排序
+
+        // 先处理排序过滤器
+        for filter in filters {
+            if let FilterValue::Sort { id, index, .. } = filter {
+                if id.as_str() == "排序" {
+                    let sorts = ["dd", "da", "ld", "vd"];
+                    if let Some(s) = sorts.get(*index as usize) {
+                        sort = s.to_string();
+                        //println!("[排序调试] 选择的排序方式: {}", sort);
+                    }
+                }
+            }
+        }
+
+        if let Some(q) = query {
+            return Ok(Self::Search {
+                query: q.to_string(),
+                sort,
+                page,
+            });
+        }
 
 		let mut category = String::new();
 		let mut sort = String::from("dd");
@@ -135,11 +152,12 @@ impl Url {
             }
         }
         // 按优先级决定返回哪种类型的请求
-        if !search_query.is_empty() {
-            Ok(Self::Search {
-                query: search_query,
-                page,
-            })
+		if !search_query.is_empty() {
+			Ok(Self::Search {
+				query: search_query,
+				sort,
+				page,
+			})
         } else if !author.is_empty() {
             Ok(Self::Author {
                 author,
@@ -168,19 +186,19 @@ impl Url {
 			_ => HttpMethod::Get,
 		};
 		let body = match self {
-            Url::Search { query, page } => Some(format!(
+            Url::Search { query, sort, page } => Some(format!(
                 r#"{{
                     "keyword": "{}",
-                    "sort": "dd",
+                    "sort": "{}",
                     "page": {}
                 }}"#,
-                query, page
+                query, sort, page
             )),
 			_ => None,
 		};
 
-		create_request(url, method, body)
-	}
+        create_request(url, method, body)
+    }
 }
 
 pub fn gen_explore_url(category: String, sort: String, page: i32) -> String {
@@ -215,8 +233,15 @@ impl Display for Url {
 					gen_explore_url(category.to_string(), sort.to_string(), *page)
 				)
 			}
-            Url::Search { .. } => {
-                write!(f, "{}/comics/advanced-search", API_URL)
+            Url::Search { query, sort, page } => {
+                write!(
+                    f,
+                    "{}/comics/advanced-search?page={}&s={}&q={}",
+                    API_URL,
+                    page,
+                    sort,
+                    encode_uri(query)  // 确保查询参数被正确编码
+                )
             }
 			Url::Author { author, sort, page } => {
 				write!(
