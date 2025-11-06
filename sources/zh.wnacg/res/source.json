@@ -4,8 +4,8 @@
 		"name": "紳士漫画",
 		"version": 1,
 		"urls": [
-			"https://www.wnacg01.cc",
 			"https://www.wnacg.com",
+			"https://www.wnacg01.cc",
 			"https://www.wnacg02.cc",
 			"https://www.wnacg03.cc",
 			"https://www.wnacg05.cc"
@@ -52,3 +52,4 @@
 		"supportsTagSearch": true
 	}
 }
+
