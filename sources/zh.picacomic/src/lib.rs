@@ -27,18 +27,7 @@ impl Source for Picacomic {
 		filters: Vec<FilterValue>,
 	) -> Result<MangaPageResult> {
 		let url = net::Url::from_query_or_filters(query.as_deref(), page, &filters)?;
-//         if let net::Url::Search { query, sort, page } = &url {
-//             println!("[搜索调试] 查询: {}, 排序: {}, 页码: {}", query, sort, page);
-//         }
-
-        let response = url.request()?.json_owned::<json::ExploreResponse>()?;
-
-//         println!(" 搜索页码: {}, 总页数: {}, 结果数: {}",
-//             page,
-//             response.data.comics.pages,
-//             response.data.comics.docs.len()
-//         );
-
+		let response: json::ExploreResponse = net::request_json(url)?;
 		Ok(response.data.into())
 	}
 
@@ -52,7 +41,7 @@ impl Source for Picacomic {
 			let url = net::Url::Manga {
 				id: manga.key.clone(),
 			};
-			let response: json::ComicResponse = url.request()?.json_owned()?;
+			let response: json::ComicResponse = net::request_json(url)?;
 			let comic: Manga = response.data.comic.into();
 			manga = Manga {
 				chapters: manga.chapters,
@@ -66,7 +55,7 @@ impl Source for Picacomic {
 				id: manga.key.clone(),
 				page,
 			};
-			let response: json::ChapterResponse = url.request()?.json_owned()?;
+			let response: json::ChapterResponse = net::request_json(url)?;
 			let mut chapters: Vec<aidoku::Chapter> =
 				response.data.eps.docs.into_iter().map(Into::into).collect();
 
@@ -90,7 +79,7 @@ impl Source for Picacomic {
 			chapter_id: chapter.key.clone(),
 			page,
 		};
-		let response: json::PageResponse = url.request()?.json_owned()?;
+		let response: json::PageResponse = net::request_json(url)?;
 		let mut pages: Vec<Page> = response
 			.data
 			.pages
@@ -117,7 +106,7 @@ impl Source for Picacomic {
 
 fn get_chapter_list_by_page(id: String, page: i32) -> Result<Vec<aidoku::Chapter>> {
 	let url = net::Url::ChapterList { id, page };
-	let response: json::ChapterResponse = url.request()?.json_owned()?;
+	let response: json::ChapterResponse = net::request_json(url)?;
 	Ok(response.data.eps.docs.into_iter().map(Into::into).collect())
 }
 
@@ -132,7 +121,7 @@ fn get_page_list_by_page(
 		chapter_id,
 		page,
 	};
-	let response: json::PageResponse = url.request()?.json_owned()?;
+	let response: json::PageResponse = net::request_json(url)?;
 	Ok(response
 		.data
 		.pages
@@ -166,15 +155,15 @@ impl ListingProvider for Picacomic {
 
 		if let Some(time) = rank_time {
 			let url = net::Url::Rank { time };
-			let response: json::RankResponse = url.request()?.json_owned()?;
+			let response: json::RankResponse = net::request_json(url)?;
 			Ok(response.data.into())
 		} else if is_random {
 			let url = net::Url::Random;
-			let response: json::RankResponse = url.request()?.json_owned()?;
+			let response: json::RankResponse = net::request_json(url)?;
 			Ok(response.data.into())
 		} else if is_favourite {
 			let url = net::Url::Favourite { sort, page };
-			let response: json::ExploreResponse = url.request()?.json_owned()?;
+			let response: json::ExploreResponse = net::request_json(url)?;
 			Ok(response.data.into())
 		} else if let Some(cat) = category {
 			let url = net::Url::Explore {
@@ -182,7 +171,7 @@ impl ListingProvider for Picacomic {
 				sort,
 				page,
 			};
-			let response: json::ExploreResponse = url.request()?.json_owned()?;
+			let response: json::ExploreResponse = net::request_json(url)?;
 			Ok(response.data.into())
 		} else {
 			self.get_search_manga_list(None, page, Vec::new())

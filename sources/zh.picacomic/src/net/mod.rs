@@ -39,18 +39,13 @@ pub enum Url {
 		sort: String,
 		page: i32,
 	},
-    Search {  // 添加 sort 字段
-        query: String,
-        sort: String,
-        page: i32,
-    },
-	Author {
-		author: String,
+	Search {
+		query: String,
 		sort: String,
 		page: i32,
 	},
-	Tag {
-		tag: String,
+	Author {
+		author: String,
 		sort: String,
 		page: i32,
 	},
@@ -77,107 +72,76 @@ pub enum Url {
 }
 
 impl Url {
-    pub fn from_query_or_filters(
-        query: Option<&str>,
-        page: i32,
-        filters: &[FilterValue],
-    ) -> Result<Self> {
-        let mut sort = String::from("dd"); // 默认排序
-
-        // 先处理排序过滤器
-        for filter in filters {
-            if let FilterValue::Sort { id, index, .. } = filter {
-                if id.as_str() == "排序" {
-                    let sorts = ["dd", "da", "ld", "vd"];
-                    if let Some(s) = sorts.get(*index as usize) {
-                        sort = s.to_string();
-                        //println!("[排序调试] 选择的排序方式: {}", sort);
-                    }
-                }
-            }
-        }
-
-        if let Some(q) = query {
-            return Ok(Self::Search {
-                query: q.to_string(),
-                sort,
-                page,
-            });
-        }
-
+	pub fn from_query_or_filters(
+		query: Option<&str>,
+		page: i32,
+		filters: &[FilterValue],
+	) -> Result<Self> {
 		let mut category = String::new();
 		let mut sort = String::from("dd");
-        let mut search_query = String::new();
-        let mut author = String::new();
-        let mut tag = String::new();
 
-        for filter in filters {
-            match filter {
-                FilterValue::Text { id, value } => match id.as_str() {
-                    "author" => {
-                        author = value.to_string();
-                    }
-                    "title" | "query" => { // 标题搜索或其他查询字段
-                        search_query = value.to_string();
-                    }
-                    _ => {
-                        // 其他文本字段也视为搜索
-                        if search_query.is_empty() {
-                            search_query = value.to_string();
-                        }
-                    }
-                },
-                FilterValue::Select { id, value } => match id.as_str() {
-                    "类别" => {
-                        category = if value.as_str() == "全部" {
-                            String::new()
-                        } else {
-                            value.to_string()
-                        };
-                    }
-                    "genre" => {
-                        tag = value.to_string();
-                    }
-                    _ => {}
-                },
-                FilterValue::Sort { id, index, .. } => {
-                    if id.as_str() == "排序" {
-                        let sorts = ["dd", "da", "ld", "vd"];
-                        if let Some(s) = sorts.get(*index as usize) {
-                            sort = s.to_string();
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-        // 按优先级决定返回哪种类型的请求
-		if !search_query.is_empty() {
-			Ok(Self::Search {
-				query: search_query,
+		if let Some(q) = query {
+			return Ok(Self::Search {
+				query: q.to_string(),
 				sort,
 				page,
-			})
-        } else if !author.is_empty() {
-            Ok(Self::Author {
-                author,
-                sort,
-                page,
-            })
-        } else if !tag.is_empty() {
-            Ok(Self::Tag {
-                tag,
-                sort,
-                page,
-            })
-        } else {
-            Ok(Self::Explore {
-                category,
-                sort,
-                page,
-            })
-        }
-    }
+			});
+		}
+
+		for filter in filters {
+			match filter {
+				FilterValue::Text { id, value } => match id.as_str() {
+					"author" => {
+						return Ok(Self::Author {
+							author: value.to_string(),
+							sort,
+							page,
+						});
+					}
+					_ => {
+						// Title search
+						return Ok(Self::Search {
+							query: value.to_string(),
+							sort,
+							page,
+						});
+					}
+				},
+				FilterValue::Select { id, value } => match id.as_str() {
+					"类别" => {
+						category = if value.as_str() == "全部" {
+							String::new()
+						} else {
+							value.to_string()
+						};
+					}
+					"genre" => {
+						return Ok(Self::Search {
+							query: value.to_string(),
+							sort,
+							page,
+						});
+					}
+					_ => {}
+				},
+				FilterValue::Sort { id, index, .. } => {
+					if id.as_str() == "排序" {
+						let sorts = ["dd", "da", "ld", "vd"];
+						if let Some(s) = sorts.get(*index as usize) {
+							sort = s.to_string();
+						}
+					}
+				}
+				_ => {}
+			}
+		}
+
+		Ok(Self::Explore {
+			category,
+			sort,
+			page,
+		})
+	}
 
 	pub fn request(&self) -> Result<Request> {
 		let url = self.to_string();
@@ -186,19 +150,18 @@ impl Url {
 			_ => HttpMethod::Get,
 		};
 		let body = match self {
-            Url::Search { query, sort, page } => Some(format!(
-                r#"{{
-                    "keyword": "{}",
-                    "sort": "{}",
-                    "page": {}
-                }}"#,
-                query, sort, page
-            )),
+			Url::Search { query, sort, .. } => Some(format!(
+				r#"{{
+					"keyword": "{}",
+					"sort": "{}"
+				}}"#,
+				query, sort
+			)),
 			_ => None,
 		};
 
-        create_request(url, method, body)
-    }
+		create_request(url, method, body)
+	}
 }
 
 pub fn gen_explore_url(category: String, sort: String, page: i32) -> String {
@@ -233,16 +196,9 @@ impl Display for Url {
 					gen_explore_url(category.to_string(), sort.to_string(), *page)
 				)
 			}
-            Url::Search { query, sort, page } => {
-                write!(
-                    f,
-                    "{}/comics/advanced-search?page={}&s={}&q={}",
-                    API_URL,
-                    page,
-                    sort,
-                    encode_uri(query)  // 确保查询参数被正确编码
-                )
-            }
+			Url::Search { page, .. } => {
+				write!(f, "{}/comics/advanced-search?page={}", API_URL, page)
+			}
 			Url::Author { author, sort, page } => {
 				write!(
 					f,
@@ -250,16 +206,6 @@ impl Display for Url {
 					API_URL,
 					page,
 					encode_uri(author),
-					sort
-				)
-			}
-			Url::Tag { tag, sort, page } => {
-				write!(
-					f,
-					"{}/comics?page={}&c={}&s={}",
-					API_URL,
-					page,
-					encode_uri(tag),
 					sort
 				)
 			}
@@ -377,4 +323,22 @@ pub fn create_request(url: String, method: HttpMethod, body: Option<String>) -> 
 	}
 
 	Ok(request)
+}
+
+pub fn request_json<T>(url: Url) -> Result<T>
+where
+	T: serde::de::DeserializeOwned,
+{
+	let request = url.request()?;
+	let mut response = request.send()?;
+
+	if response.status_code() == 401 {
+		// Token expired, login again
+		login()?;
+		// Retry with new token
+		let request = url.request()?;
+		response = request.send()?;
+	}
+
+	response.get_json_owned()
 }
